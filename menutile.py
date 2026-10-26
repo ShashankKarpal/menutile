@@ -71,6 +71,8 @@ def _child_env():
     env = dict(os.environ)
     env.pop("PYTHONHOME", None)
     env.pop("PYTHONPATH", None)
+    # Only a manual forced refresh sets this, per run; never inherit it.
+    env.pop("MENUTILE_FORCE", None)
     return env
 
 
@@ -154,7 +156,9 @@ class MenuTile(rumps.App):
         self._lock = threading.Lock()
         self._icon_cache = {}
         self._refresh_running = False
+        self._running_forced = False
         self._force_queued = False
+        self._force_due = False
         self.poll_timer = rumps.Timer(self.poll, interval)
         self.poll_timer.start()
         self.apply_timer = rumps.Timer(self.apply_pending, 1)
@@ -164,17 +168,25 @@ class MenuTile(rumps.App):
     # ---- worker side ----
 
     def poll(self, _sender=None, force=False):
-        # Check-and-set under the lock: the timer (main thread) and a queued
-        # manual refresh (worker thread) can both arrive here. A forced
-        # refresh that lands while a run is in flight is queued, not dropped;
-        # a timer tick during a run is still dropped.
+        # Check-and-set under the lock: the timer and a queued manual refresh
+        # can both arrive here. A forced refresh that lands while a plain run
+        # is in flight is queued, not dropped; one that lands during a forced
+        # run is already covered by it (a double-click costs one run). A
+        # timer tick during a run is dropped.
         with self._lock:
             if self._refresh_running:
-                if force:
+                if force and not self._running_forced:
                     self._force_queued = True
                 return
             self._refresh_running = True
-        threading.Thread(target=self._worker, args=(force,), daemon=True).start()
+            self._running_forced = force
+        try:
+            threading.Thread(target=self._worker, args=(force,), daemon=True).start()
+        except Exception as e:  # noqa: BLE001 - a failed start must not freeze polling
+            log("worker start failed: %s: %s" % (type(e).__name__, e))
+            with self._lock:
+                self._refresh_running = False
+                self._running_forced = False
 
     def _worker(self, force=False):
         # The flag is cleared in finally, under the lock: if anything between
@@ -200,23 +212,29 @@ class MenuTile(rumps.App):
             with self._lock:
                 self._pending = result
         finally:
+            # A queued forced refresh runs from apply_pending, after this
+            # run's result has been shown, so it can never overwrite that
+            # result (or its one-shot notify lines) before it is applied.
             with self._lock:
                 self._refresh_running = False
-                again, self._force_queued = self._force_queued, False
-            if again:
-                self.poll(force=True)
+                self._running_forced = False
+                if self._force_queued:
+                    self._force_queued = False
+                    self._force_due = True
 
     # ---- UI side (main thread via rumps timers) ----
 
     def apply_pending(self, _sender=None):
         with self._lock:
             result, self._pending = self._pending, None
-        if result is None:
-            return
-        if result[0] == "ok":
-            self._render(result[1], result[2])
-        else:
-            self._render_error(result[1], result[2])
+            due, self._force_due = self._force_due, False
+        if result is not None:
+            if result[0] == "ok":
+                self._render(result[1], result[2])
+            else:
+                self._render_error(result[1], result[2])
+        if due:
+            self.poll(force=True)
 
     def _render(self, title_lines, menu_blocks):
         text, params = parse_line(title_lines[0]) if title_lines else ("?", {})
