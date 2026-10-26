@@ -99,6 +99,10 @@ part of the text):
   plus any `--allow-root`. Anything else is logged and the row is not
   clickable. The reason: a `bash=` action runs whatever the script printed,
   and scripts often render text that came from somewhere else.
+  If your script prints text it did not write (a message, a title, a file
+  name), strip `|` from it first: a `|` in that text starts a parameter
+  tail, so it could add its own `bash=` action that points at an allowed
+  binary such as `/usr/bin/osascript`.
 
 Keep title text ASCII. Under a LaunchAgent the environment has no locale,
 and a stray multibyte character in the title line can fail the stdout
