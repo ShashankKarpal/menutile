@@ -9,7 +9,9 @@ identity instead of borrowing a shared host's. Scripts run unchanged.
 Supported dialect (the common SwiftBar/xbar subset, parsed
 tolerantly): title line with optional `color` and `templateImage`
 (base64 PNG); `---` separators; menu lines with `color`, `size`,
-`refresh=true`, `bash=` with `param1..paramN` and `terminal=true/false`.
+`refresh=true` (with `force=true`, that one run gets MENUTILE_FORCE=1 in its
+environment, so a script with a cache can skip it), `bash=` with
+`param1..paramN` and `terminal=true/false`.
 Unknown parameters are ignored, never fatal. A line whose tail does not
 parse as parameters is treated as plain text, whole.
 
@@ -152,6 +154,7 @@ class MenuTile(rumps.App):
         self._lock = threading.Lock()
         self._icon_cache = {}
         self._refresh_running = False
+        self._force_queued = False
         self.poll_timer = rumps.Timer(self.poll, interval)
         self.poll_timer.start()
         self.apply_timer = rumps.Timer(self.apply_pending, 1)
@@ -160,20 +163,31 @@ class MenuTile(rumps.App):
 
     # ---- worker side ----
 
-    def poll(self, _sender=None):
-        if self._refresh_running:
-            return
-        self._refresh_running = True
-        threading.Thread(target=self._worker, daemon=True).start()
+    def poll(self, _sender=None, force=False):
+        # Check-and-set under the lock: the timer (main thread) and a queued
+        # manual refresh (worker thread) can both arrive here. A forced
+        # refresh that lands while a run is in flight is queued, not dropped;
+        # a timer tick during a run is still dropped.
+        with self._lock:
+            if self._refresh_running:
+                if force:
+                    self._force_queued = True
+                return
+            self._refresh_running = True
+        threading.Thread(target=self._worker, args=(force,), daemon=True).start()
 
-    def _worker(self):
+    def _worker(self, force=False):
         # The flag is cleared in finally, under the lock: if anything between
         # the thread start and here ever raised past the except, the app
         # would stop polling forever with no visible symptom.
         try:
             try:
+                env = _child_env()
+                if force:
+                    env["MENUTILE_FORCE"] = "1"
+                    log("manual refresh (force)")
                 p = subprocess.run(self.script_cmd, capture_output=True,
-                                   text=True, timeout=120, env=_child_env())
+                                   text=True, timeout=120, env=env)
                 if p.returncode != 0 or not p.stdout.strip():
                     err = (p.stderr or p.stdout or "no output").strip()
                     log("script rc=%s: %s" % (p.returncode, err[:200]))
@@ -188,6 +202,9 @@ class MenuTile(rumps.App):
         finally:
             with self._lock:
                 self._refresh_running = False
+                again, self._force_queued = self._force_queued, False
+            if again:
+                self.poll(force=True)
 
     # ---- UI side (main thread via rumps timers) ----
 
@@ -343,7 +360,8 @@ class MenuTile(rumps.App):
 
     def _callback_for(self, params):
         if params.get("refresh") == "true":
-            return lambda _s: self.poll()
+            force = params.get("force") == "true"
+            return lambda _s, force=force: self.poll(force=force)
         if "bash" in params:
             # Allowlist: a bash= action runs whatever the hosted script
             # printed, and a script may render text that originates

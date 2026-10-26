@@ -88,6 +88,10 @@ part of the text):
 - `---` separates the title block from menu blocks and menu blocks from
   each other (rendered as separators).
 - Rows: text, `color`, `size`, `refresh=true` (re-runs the script),
+  `refresh=true force=true` (re-runs it once with `MENUTILE_FORCE=1` in its
+  environment, so a script that caches can skip its cache for a manual
+  click; a forced click during a run is queued and runs when that run ends,
+  a timer tick during a run is skipped),
   `bash=/path param1=.. paramN=.. terminal=true|false`. Leading `--` marks
   submenu depth, rendered as indentation.
 - `bash=` executables must resolve (after `realpath`) under an allowed root:
@@ -122,6 +126,10 @@ decode and kill the render.
 ```bash
 ~/.menutile-venv/bin/python3 -m unittest discover -s tests -v
 ```
+
+`tests/test_parse.py` covers the dialect parser and the action allowlist;
+`tests/test_refresh.py` covers forced and queued refreshes without starting
+the menu bar. CI runs gitleaks on every push and weekly.
 
 ## Design principle
 
