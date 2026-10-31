@@ -150,4 +150,4 @@ what the script printed and never reimplements a script's behaviour.
 
 ## License
 
-MIT. Copyright 2026 Shashank Karpal.
+MIT for the source code; see [LICENSE](LICENSE). The name, logos, icons and other brand assets are not covered; see [TRADEMARKS.md](TRADEMARKS.md). Copyright 2026 Shashank Karpal.
