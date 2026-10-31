@@ -17,6 +17,11 @@
 - .gitleaks.toml (root) replaces the old "no .gitleaks.toml" line: it extends the default rules and allowlists the two provenance files, whose tokenSha256 checksum trips the generic-api-key rule. It is the same file every brand consumer repo carries.
 - scripts/make_bundle.sh was not touched; it is still byte-identical (cmp) to the switchdeck copy.
 
+## 2026-10-31: forced refresh, the gap before apply_pending (ported review fixes)
+- Three fixes ported from the private original's 2026-10-30 review, one commit each, each with a tests/test_refresh.py case that fails on its parent: a render that raises still runs the queued click (ac5cab0, the poll sits in a finally); a timer tick is dropped while a queued click is due (2722362, so a plain run cannot overwrite the unapplied result); a forced click in that gap clears the due mark (26ee408, so one intent costs one forced run). tests/test_refresh.py has 13 cases; the suite has 27.
+- Unchanged by decision: a click during a forced run is not queued again; the next timer tick covers a late second click.
+- scripts/make_bundle.sh was not touched; still byte-identical (cmp) to the switchdeck copy.
+
 ## Rules
 1. Never commit secrets; templates belong in *.example files.
 2. Public text names no private repository of the author's; the original host's name stays out of this repo, its history and its commit messages.
