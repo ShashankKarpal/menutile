@@ -172,19 +172,20 @@ class MenuTile(rumps.App):
         # can both arrive here. A forced refresh that lands while a plain run
         # is in flight is queued, not dropped; one that lands during a forced
         # run is already covered by it (a double-click costs one run). A
-        # timer tick during a run is dropped, and so is one while a queued
-        # forced refresh waits for apply_pending (it starts within a second
-        # and refreshes anyway). A forced click in that wait is the due run
-        # itself, so it clears it.
+        # timer tick during a run is dropped. Between a run's end and
+        # apply_pending (up to a second), a new run could overwrite the
+        # result, and its one-shot notify lines, before it is shown: a tick
+        # in that wait is dropped, and a forced click becomes the forced run
+        # apply_pending starts after the result is shown (one click, one run).
         with self._lock:
             if self._refresh_running:
                 if force and not self._running_forced:
                     self._force_queued = True
                 return
-            if self._force_due:
-                if not force:
-                    return
-                self._force_due = False
+            if self._pending is not None or self._force_due:
+                if force:
+                    self._force_due = True
+                return
             self._refresh_running = True
             self._running_forced = force
         try:

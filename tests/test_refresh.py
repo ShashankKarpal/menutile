@@ -98,24 +98,44 @@ class ForcedRefresh(unittest.TestCase):
         o = make(due=True)
         started = []
         with mock.patch.object(menutile.threading, "Thread") as thread:
-            thread.side_effect = lambda target, args, daemon: started.append(args) or mock.Mock()
+            thread.side_effect = lambda *a, **k: started.append(k["args"]) or mock.Mock()
             o.poll()
-            self.assertEqual(started, [])
-            self.assertFalse(o._refresh_running)
-            o.poll(force=True)
-            self.assertEqual(started, [(True,)])
+        self.assertEqual(started, [])
+        self.assertFalse(o._refresh_running)
 
     def test_forced_click_while_a_queued_click_is_due_is_that_click(self):
-        # A manual click in the same gap is the due forced run itself:
-        # apply_pending must not start a second cache-bypassing run.
+        # A manual click in the same gap is the due forced run itself: it
+        # starts nothing now, and apply_pending shows the waiting result and
+        # then starts exactly one forced run.
         o = make(due=True)
-        with mock.patch.object(menutile.threading, "Thread"):
+        o._pending = ("ok", ["waiting"], [])
+        with mock.patch.object(menutile.threading, "Thread") as thread:
             o.poll(force=True)
-        self.assertFalse(o._force_due)
+        thread.assert_not_called()
+        self.assertTrue(o._force_due)
         calls = []
         o.poll = lambda _s=None, force=False: calls.append(force)
         o.apply_pending()
-        self.assertEqual(calls, [])
+        self.assertEqual(o.rendered, [["waiting"]])
+        self.assertEqual(calls, [True])
+
+    def test_no_run_starts_while_a_result_waits_to_be_shown(self):
+        # A finished run's result waits up to a second for apply_pending. A
+        # run started in that wait could overwrite it (and its one-shot
+        # notify lines) before it is shown: a tick is dropped, and a forced
+        # click becomes the run apply_pending starts.
+        o = make()
+        o._pending = ("ok", ["waiting"], [])
+        with mock.patch.object(menutile.threading, "Thread") as thread:
+            o.poll()
+            o.poll(force=True)
+        thread.assert_not_called()
+        self.assertTrue(o._force_due)
+        calls = []
+        o.poll = lambda _s=None, force=False: calls.append(force)
+        o.apply_pending()
+        self.assertEqual(o.rendered, [["waiting"]])
+        self.assertEqual(calls, [True])
 
     def test_render_that_raises_still_runs_the_queued_click(self):
         # apply_pending clears the due mark before it renders, so a render
