@@ -1,0 +1,91 @@
+{
+  "assets": [
+    {
+      "destination": "design/github/readme-banner-dark-1400x400.png",
+      "destinationSha256": "e9f6b00b2a56d3a7b50738e44f779e44c27e3826d09a3f330d196dcac8ea8478",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/web/banner-dark-1400x400.png",
+      "sourceSha256": "e9f6b00b2a56d3a7b50738e44f779e44c27e3826d09a3f330d196dcac8ea8478"
+    },
+    {
+      "destination": "design/github/readme-banner-dark-1400x400.svg",
+      "destinationSha256": "8513639374486ddc2da6543760fc3d0ab7882ddfa56494afa60bdf581e6784d8",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/web/banner-dark-1400x400.svg",
+      "sourceSha256": "8513639374486ddc2da6543760fc3d0ab7882ddfa56494afa60bdf581e6784d8"
+    },
+    {
+      "destination": "design/github/readme-banner-light-1400x400.png",
+      "destinationSha256": "14da389fa6a8af152e82b71eb7311a0e959316ac88b60131a805b1adf2ab7fc8",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/web/banner-light-1400x400.png",
+      "sourceSha256": "14da389fa6a8af152e82b71eb7311a0e959316ac88b60131a805b1adf2ab7fc8"
+    },
+    {
+      "destination": "design/github/readme-banner-light-1400x400.svg",
+      "destinationSha256": "1aa1dd45b1779facc00f8fb3b5ffe04a89126d2789012ba657ec81f491f7fe5f",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/web/banner-light-1400x400.svg",
+      "sourceSha256": "1aa1dd45b1779facc00f8fb3b5ffe04a89126d2789012ba657ec81f491f7fe5f"
+    },
+    {
+      "destination": "design/github/social-preview-1280x640.png",
+      "destinationSha256": "dffa9583e7a40a7ec9ba343cb651f010138134cc18faa5bb172a7cb5d31c4cd5",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/web/social-preview-1280x640.png",
+      "sourceSha256": "dffa9583e7a40a7ec9ba343cb651f010138134cc18faa5bb172a7cb5d31c4cd5"
+    },
+    {
+      "destination": "design/logo/menutile-lockup-horizontal-dark.svg",
+      "destinationSha256": "ad0f4a9a291faf67b4f81655204c822eed0556dce9813c804b3945d4d5f05729",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/wordmark/wordmark-horizontal-dark.svg",
+      "sourceSha256": "ad0f4a9a291faf67b4f81655204c822eed0556dce9813c804b3945d4d5f05729"
+    },
+    {
+      "destination": "design/logo/menutile-lockup-horizontal.svg",
+      "destinationSha256": "15a5ed96ca52aade59624eda7b8c5a4bdd4bdc6054f52439e66ea680dc050b20",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/wordmark/wordmark-horizontal-light.svg",
+      "sourceSha256": "15a5ed96ca52aade59624eda7b8c5a4bdd4bdc6054f52439e66ea680dc050b20"
+    },
+    {
+      "destination": "design/logo/menutile-symbol-dark.svg",
+      "destinationSha256": "01fc53f3160f4d98b6f5de5a5b0727c0d90daf3218467d8d69ea175644c68828",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/svg/mark.svg",
+      "sourceSha256": "01fc53f3160f4d98b6f5de5a5b0727c0d90daf3218467d8d69ea175644c68828"
+    },
+    {
+      "destination": "design/logo/menutile-symbol-mono-black.svg",
+      "destinationSha256": "444824678a0872ebfe8eac47d5dcdd42c9151ae06aa84d5afa76f48de0741a5c",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/svg/mark-mono.svg",
+      "sourceSha256": "444824678a0872ebfe8eac47d5dcdd42c9151ae06aa84d5afa76f48de0741a5c"
+    },
+    {
+      "destination": "design/logo/menutile-symbol.svg",
+      "destinationSha256": "11363792ee46130403098bbe370bf5d49e4b608a73a23f37724cc9f04e8f485b",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/svg/mark-light.svg",
+      "sourceSha256": "11363792ee46130403098bbe370bf5d49e4b608a73a23f37724cc9f04e8f485b"
+    },
+    {
+      "destination": "design/web/favicon.svg",
+      "destinationSha256": "a80f20ada2dbdf73a490a71f63bd4a3c5915a86a97876721b63084bfbd539e0f",
+      "mode": "copy",
+      "source": "design/marks/out/menutile/web/favicon.svg",
+      "sourceSha256": "a80f20ada2dbdf73a490a71f63bd4a3c5915a86a97876721b63084bfbd539e0f"
+    }
+  ],
+  "brandVersion": "1.1.0",
+  "canonicalSourceCommit": "b681f8e6b54f1d311ba55834a81653dc179ce03f",
+  "canonicalSourceDirty": false,
+  "contentSetSha256": "bb5963269de4845ffc7b88c3855068501c27b247bd335015817d90ad30b5a40c",
+  "generatorSha256": "3863ed056458cb768d47c28ad075afe2c4815be1c0b341d149c1d0a10cd23b0f",
+  "lockSha256": "d8574f93ee9b99d1758cfbb20da047518e49df75c0cd8a5ac5697b397542a802",
+  "project": "menutile",
+  "schemaVersion": 1,
+  "tokenSha256": "62c4feeeb3f167d2c4b649594a1dd9b66d57677826610cdf08a6f27ebf48e837",
+  "visibility": "public"
+}

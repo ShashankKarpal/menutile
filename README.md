@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"  srcset="design/github/readme-banner-dark-1400x400.png">
+    <source media="(prefers-color-scheme: light)" srcset="design/github/readme-banner-light-1400x400.png">
+    <img alt="menutile" src="design/github/readme-banner-dark-1400x400.png" width="680">
+  </picture>
+</p>
+
 # menutile
 
 One menu bar app per status script, each with a real identity.
