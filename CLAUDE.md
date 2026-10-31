@@ -13,7 +13,7 @@
 
 ## 2026-10-31: brand mark (Ink and Bone ibp-07, brass)
 - The repo carries the mark "a loose script, given a tile of its own" as repo branding only: the README banner, design/github, design/logo and design/web/favicon.svg. The author's public brand repo (ShashankKarpal/shashankkarpal) distributes these files and records their provenance in design/BRAND-ASSETS.json and .md. Never edit them by hand; a change comes from that repo's distributor.
-- The mark is never a default icon for the tiles menutile builds: each tile is its user's own app, and `scripts/install.sh --icns` stays the user's choice.
+- Owner decision 2026-10-30 (recorded here on 2026-10-31, the day the mark landed): the mark is never a default icon for the tiles menutile builds: each tile is its user's own app, and `scripts/install.sh --icns` stays the user's choice.
 - .gitleaks.toml (root) replaces the old "no .gitleaks.toml" line: it extends the default rules and allowlists the two provenance files, whose tokenSha256 checksum trips the generic-api-key rule. It is the same file every brand consumer repo carries.
 - scripts/make_bundle.sh was not touched; it is still byte-identical (cmp) to the switchdeck copy.
 
