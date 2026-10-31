@@ -137,6 +137,22 @@ class ForcedRefresh(unittest.TestCase):
         self.assertEqual(o.rendered, [["waiting"]])
         self.assertEqual(calls, [True])
 
+    def test_click_in_the_wait_starts_one_forced_worker_after_apply(self):
+        # The whole path with the real poll: a click while a result waits
+        # starts nothing, then apply_pending shows the result and starts one
+        # forced worker.
+        o = make()
+        o._pending = ("ok", ["waiting"], [])
+        with mock.patch.object(menutile.threading, "Thread") as thread:
+            o.poll(force=True)
+            thread.assert_not_called()
+            o.apply_pending()
+        self.assertEqual(o.rendered, [["waiting"]])
+        self.assertEqual(thread.call_count, 1)
+        self.assertEqual(thread.call_args.kwargs["args"], (True,))
+        self.assertTrue(o._running_forced)
+        self.assertFalse(o._force_due)
+
     def test_render_that_raises_still_runs_the_queued_click(self):
         # apply_pending clears the due mark before it renders, so a render
         # that raises must not lose the click it stands for.
