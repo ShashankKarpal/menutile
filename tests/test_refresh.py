@@ -91,6 +91,20 @@ class ForcedRefresh(unittest.TestCase):
         self.assertEqual(calls, [True])
         self.assertFalse(o._force_due)
 
+    def test_timer_tick_is_dropped_while_a_queued_click_is_due(self):
+        # Between the worker's end and apply_pending, a timer tick must not
+        # start a plain run that overwrites the unapplied result and pushes
+        # the click back a run.
+        o = make(due=True)
+        started = []
+        with mock.patch.object(menutile.threading, "Thread") as thread:
+            thread.side_effect = lambda target, args, daemon: started.append(args) or mock.Mock()
+            o.poll()
+            self.assertEqual(started, [])
+            self.assertFalse(o._refresh_running)
+            o.poll(force=True)
+            self.assertEqual(started, [(True,)])
+
     def test_render_that_raises_still_runs_the_queued_click(self):
         # apply_pending clears the due mark before it renders, so a render
         # that raises must not lose the click it stands for.
