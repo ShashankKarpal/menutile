@@ -228,13 +228,17 @@ class MenuTile(rumps.App):
         with self._lock:
             result, self._pending = self._pending, None
             due, self._force_due = self._force_due, False
-        if result is not None:
-            if result[0] == "ok":
-                self._render(result[1], result[2])
-            else:
-                self._render_error(result[1], result[2])
-        if due:
-            self.poll(force=True)
+        try:
+            if result is not None:
+                if result[0] == "ok":
+                    self._render(result[1], result[2])
+                else:
+                    self._render_error(result[1], result[2])
+        finally:
+            # The flag is already cleared; a render that raises must not
+            # swallow the click it stands for.
+            if due:
+                self.poll(force=True)
 
     def _render(self, title_lines, menu_blocks):
         text, params = parse_line(title_lines[0]) if title_lines else ("?", {})

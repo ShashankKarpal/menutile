@@ -91,6 +91,22 @@ class ForcedRefresh(unittest.TestCase):
         self.assertEqual(calls, [True])
         self.assertFalse(o._force_due)
 
+    def test_render_that_raises_still_runs_the_queued_click(self):
+        # apply_pending clears the due mark before it renders, so a render
+        # that raises must not lose the click it stands for.
+        o = make(due=True)
+        o._pending = ("ok", ["x"], [])
+        calls = []
+        o.poll = lambda _s=None, force=False: calls.append(force)
+
+        def boom(*a):
+            raise RuntimeError("render failed")
+
+        o._render = boom
+        with self.assertRaises(RuntimeError):
+            o.apply_pending()
+        self.assertEqual(calls, [True])
+
     def test_idle_forced_poll_runs_the_worker_forced(self):
         o = make()
         o.poll(force=True)
