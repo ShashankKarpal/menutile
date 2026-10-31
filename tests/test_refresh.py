@@ -33,6 +33,7 @@ def make(running=False, forced=False, queued=False, due=False):
     o._running_forced = forced
     o._force_queued = queued
     o._force_due = due
+    o._poll_due = False
     o.rendered = []
     o._render = lambda title, blocks: o.rendered.append(title)
     o._render_error = lambda a, b: o.rendered.append(("error", a))
@@ -152,6 +153,30 @@ class ForcedRefresh(unittest.TestCase):
         self.assertEqual(thread.call_args.kwargs["args"], (True,))
         self.assertTrue(o._running_forced)
         self.assertFalse(o._force_due)
+
+    def test_plain_poll_in_the_wait_runs_after_apply(self):
+        # A timer tick or plain click in the wait is postponed, not dropped:
+        # a script whose run time is close to the interval would otherwise
+        # lose every other tick, and a "Retry now" click would do nothing.
+        o = make()
+        o._pending = ("ok", ["waiting"], [])
+        with mock.patch.object(menutile.threading, "Thread") as thread:
+            o.poll()
+            thread.assert_not_called()
+            o.apply_pending()
+        self.assertEqual(o.rendered, [["waiting"]])
+        self.assertEqual(thread.call_count, 1)
+        self.assertEqual(thread.call_args.kwargs["args"], (False,))
+
+    def test_forced_click_wins_over_a_postponed_tick(self):
+        o = make()
+        o._pending = ("ok", ["waiting"], [])
+        with mock.patch.object(menutile.threading, "Thread") as thread:
+            o.poll()
+            o.poll(force=True)
+            o.apply_pending()
+        self.assertEqual(thread.call_count, 1)
+        self.assertEqual(thread.call_args.kwargs["args"], (True,))
 
     def test_render_that_raises_still_runs_the_queued_click(self):
         # apply_pending clears the due mark before it renders, so a render

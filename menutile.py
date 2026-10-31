@@ -159,6 +159,7 @@ class MenuTile(rumps.App):
         self._running_forced = False
         self._force_queued = False
         self._force_due = False
+        self._poll_due = False
         self.poll_timer = rumps.Timer(self.poll, interval)
         self.poll_timer.start()
         self.apply_timer = rumps.Timer(self.apply_pending, 1)
@@ -174,17 +175,19 @@ class MenuTile(rumps.App):
         # run is already covered by it (a double-click costs one run). A
         # timer tick during a run is dropped. Between a run's end and
         # apply_pending (up to a second), a new run could overwrite the
-        # result, and its one-shot notify lines, before it is shown: a tick
-        # in that wait is dropped, and a forced click becomes the forced run
-        # apply_pending starts after the result is shown (one click, one run).
+        # result, and its one-shot notify lines, before it is shown, so a
+        # poll in that wait is postponed: apply_pending starts it after the
+        # result is shown, forced if any postponed poll was forced (one run).
         with self._lock:
             if self._refresh_running:
                 if force and not self._running_forced:
                     self._force_queued = True
                 return
-            if self._pending is not None or self._force_due:
+            if self._pending is not None or self._force_due or self._poll_due:
                 if force:
                     self._force_due = True
+                else:
+                    self._poll_due = True
                 return
             self._refresh_running = True
             self._running_forced = force
@@ -236,6 +239,7 @@ class MenuTile(rumps.App):
         with self._lock:
             result, self._pending = self._pending, None
             due, self._force_due = self._force_due, False
+            plain_due, self._poll_due = self._poll_due, False
         try:
             if result is not None:
                 if result[0] == "ok":
@@ -247,6 +251,8 @@ class MenuTile(rumps.App):
             # swallow the click it stands for.
             if due:
                 self.poll(force=True)
+            elif plain_due:
+                self.poll()
 
     def _render(self, title_lines, menu_blocks):
         text, params = parse_line(title_lines[0]) if title_lines else ("?", {})
