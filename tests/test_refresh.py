@@ -105,6 +105,18 @@ class ForcedRefresh(unittest.TestCase):
             o.poll(force=True)
             self.assertEqual(started, [(True,)])
 
+    def test_forced_click_while_a_queued_click_is_due_is_that_click(self):
+        # A manual click in the same gap is the due forced run itself:
+        # apply_pending must not start a second cache-bypassing run.
+        o = make(due=True)
+        with mock.patch.object(menutile.threading, "Thread"):
+            o.poll(force=True)
+        self.assertFalse(o._force_due)
+        calls = []
+        o.poll = lambda _s=None, force=False: calls.append(force)
+        o.apply_pending()
+        self.assertEqual(calls, [])
+
     def test_render_that_raises_still_runs_the_queued_click(self):
         # apply_pending clears the due mark before it renders, so a render
         # that raises must not lose the click it stands for.

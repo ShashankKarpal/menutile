@@ -174,14 +174,17 @@ class MenuTile(rumps.App):
         # run is already covered by it (a double-click costs one run). A
         # timer tick during a run is dropped, and so is one while a queued
         # forced refresh waits for apply_pending (it starts within a second
-        # and refreshes anyway).
+        # and refreshes anyway). A forced click in that wait is the due run
+        # itself, so it clears it.
         with self._lock:
             if self._refresh_running:
                 if force and not self._running_forced:
                     self._force_queued = True
                 return
-            if not force and self._force_due:
-                return
+            if self._force_due:
+                if not force:
+                    return
+                self._force_due = False
             self._refresh_running = True
             self._running_forced = force
         try:
