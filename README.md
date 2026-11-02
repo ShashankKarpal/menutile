@@ -98,8 +98,12 @@ part of the text):
 - Rows: text, `color`, `size`, `refresh=true` (re-runs the script),
   `refresh=true force=true` (re-runs it once with `MENUTILE_FORCE=1` in its
   environment, so a script that caches can skip its cache for a manual
-  click; a forced click during a run is queued and runs when that run ends,
-  a timer tick during a run is skipped),
+  click). A forced click during a plain run is queued and runs right after
+  that run's result is drawn; a forced click during a forced run is already
+  covered by it (a double click costs one run); a timer tick or a plain
+  click during any run is skipped. A refresh that lands while a finished
+  result waits to be drawn (up to a second) runs right after it is drawn,
+  forced if any of those was forced.
   `bash=/path param1=.. paramN=.. terminal=true|false`. Leading `--` marks
   submenu depth, rendered as indentation.
 - `bash=` executables must resolve (after `realpath`) under an allowed root:
