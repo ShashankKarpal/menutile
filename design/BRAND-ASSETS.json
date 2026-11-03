@@ -78,14 +78,14 @@
       "sourceSha256": "a80f20ada2dbdf73a490a71f63bd4a3c5915a86a97876721b63084bfbd539e0f"
     }
   ],
-  "brandVersion": "1.1.0",
-  "canonicalSourceCommit": "5facb9973fb9ccb2445a67f94dfc124aa0c077f6",
+  "brandVersion": "1.2.0",
+  "canonicalSourceCommit": "9a429aff2281d93b2670972abe245e218f32a307",
   "canonicalSourceDirty": false,
   "contentSetSha256": "bb5963269de4845ffc7b88c3855068501c27b247bd335015817d90ad30b5a40c",
-  "generatorSha256": "6b05c8c2301445a16f927e212ca0c2120d67af2a5d10f9aa65e9f575c1ec8a39",
+  "generatorSha256": "cf6ed6ac2987fa837df2d10929e879865a9a32dd1ddf2adf732c9bd28dd5f0fa",
   "lockSha256": "d8574f93ee9b99d1758cfbb20da047518e49df75c0cd8a5ac5697b397542a802",
   "project": "menutile",
   "schemaVersion": 1,
-  "tokenSha256": "62c4feeeb3f167d2c4b649594a1dd9b66d57677826610cdf08a6f27ebf48e837",
+  "tokenSha256": "4cec6442e911fe5a45bb82bfab679e4534a9b4e9301d6d07a120ccef57ded736",
   "visibility": "public"
 }
