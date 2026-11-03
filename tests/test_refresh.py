@@ -228,8 +228,8 @@ class ForcedRefresh(unittest.TestCase):
         calls = []
         o.poll = lambda _s=None, force=False: calls.append(force)
         with mock.patch.object(menutile.rumps, "MenuItem",
-                               side_effect=lambda title, callback=None:
-                               (title, callback)):
+                               side_effect=lambda title, *a, callback=None,
+                               **k: (title, callback)):
             menutile.MenuTile._render_error(o, "rc=1", "boom")
         retry = [cb for title, cb in shown if title == "Retry now"]
         self.assertEqual(len(retry), 1, shown)

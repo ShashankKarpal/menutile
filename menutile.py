@@ -10,8 +10,9 @@ Supported dialect (the common SwiftBar/xbar subset, parsed
 tolerantly): title line with optional `color` and `templateImage`
 (base64 PNG); `---` separators; menu lines with `color`, `size`,
 `refresh=true` (with `force=true`, that one run gets MENUTILE_FORCE=1 in its
-environment, so a script with a cache can skip it), `bash=` with
-`param1..paramN` and `terminal=true/false`.
+environment, so a script with a cache can skip it; the error menu's
+"Retry now" runs the same way), `bash=` with `param1..paramN` and
+`terminal=true/false`.
 Unknown parameters are ignored, never fatal. A line whose tail does not
 parse as parameters is treated as plain text, whole.
 
@@ -71,7 +72,8 @@ def _child_env():
     env = dict(os.environ)
     env.pop("PYTHONHOME", None)
     env.pop("PYTHONPATH", None)
-    # Only a manual forced refresh sets this, per run; never inherit it.
+    # Only a manual forced refresh (a force=true row or Retry now) sets
+    # this, per run; never inherit it.
     env.pop("MENUTILE_FORCE", None)
     return env
 
