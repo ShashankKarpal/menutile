@@ -127,7 +127,8 @@ decode and kill the render.
   A quiet log is a healthy one.
 - The script runs in a worker thread with a 120 s timeout; a slow script
   never blocks the bar. A failing script renders `<Name> ?` with the error
-  and a Retry row instead of disappearing.
+  and a Retry now row that runs the script once forced (`MENUTILE_FORCE=1`,
+  like `refresh=true force=true`) instead of disappearing.
 - Script-only changes need no restart: the renderer re-runs the script every
   poll. A rebuilt bundle needs `launchctl bootout` then `bootstrap` of its
   agent, which `install.sh` does; `launchctl kickstart -k` refuses a

@@ -30,6 +30,12 @@
 - "Retry now" in the error menu stays a plain poll, not a forced one (owner decision 2026-10-31). A click while a run is in flight is dropped and the next timer tick covers it; a click in the wait before apply_pending is postponed to it (d48483e). The private original follows the same rule.
 - Prior-art check of the mark (2026-10-31, report only, web search): no well-known mark with the same shape was found (a chevron beside an empty rounded square). The nearest results were icon-library "square chevron right" glyphs, where the chevron sits inside the square, and one small personal site whose mark is a chevron plus a filled cursor block. Neither is a close match. No change to the mark.
 
+## 2026-11-03: "Retry now" is a forced poll
+- Owner decision 2026-11-02, superseding the 2026-10-31 "Retry now stays a plain poll" line above (kept as history): the error menu's "Retry now" calls `self.poll(force=True)`, the same path as a `refresh=true force=true` row. A click during a plain run is queued instead of dropped; a click in the wait before apply_pending becomes the forced run apply_pending starts; the script gets `MENUTILE_FORCE=1`, so a cached script skips its cache. The double-click rule is unchanged (a click during a forced run is not queued again). The private original makes the same change.
+- Test first: tests/test_refresh.py test_retry_now_in_the_error_menu_is_a_forced_poll builds the error menu through the class's own _render_error (rumps.MenuItem patched to record title and callback, _set_menu stubbed), clicks "Retry now" and expects one forced poll. Red on the parent ([False]), green after. tests/test_refresh.py has 18 cases; the suite has 32.
+- README: the failing-script line names the Retry now row and what it does.
+- scripts/make_bundle.sh was not touched; still byte-identical (cmp) to the switchdeck copy.
+
 ## Rules
 1. Never commit secrets; templates belong in *.example files.
 2. Public text names no private repository of the author's; the original host's name stays out of this repo, its history and its commit messages.

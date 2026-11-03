@@ -218,6 +218,24 @@ class ForcedRefresh(unittest.TestCase):
         o._callback_for({"refresh": "true"})(None)
         self.assertEqual(calls, [True, False])
 
+    def test_retry_now_in_the_error_menu_is_a_forced_poll(self):
+        # make() replaces _render_error on the instance, so call the class's
+        # own method; _set_menu is stubbed because the real one clears
+        # self.menu, which a __new__ object does not have.
+        o = make()
+        shown = []
+        o._set_menu = shown.extend
+        calls = []
+        o.poll = lambda _s=None, force=False: calls.append(force)
+        with mock.patch.object(menutile.rumps, "MenuItem",
+                               side_effect=lambda title, callback=None:
+                               (title, callback)):
+            menutile.MenuTile._render_error(o, "rc=1", "boom")
+        retry = [cb for title, cb in shown if title == "Retry now"]
+        self.assertEqual(len(retry), 1, shown)
+        retry[0](None)
+        self.assertEqual(calls, [True])
+
 
 if __name__ == "__main__":
     unittest.main()

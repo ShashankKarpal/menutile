@@ -306,7 +306,9 @@ class MenuTile(rumps.App):
         self._set_menu([
             rumps.MenuItem("%s: script failed (%s)" % (self.app_name, kind)),
             rumps.MenuItem(detail[:120]),
-            rumps.MenuItem("Retry now", callback=lambda _s: self.poll()),
+            # A forced poll, like a `refresh=true force=true` row (owner
+            # 2026-11-02): queued during a plain run, MENUTILE_FORCE=1.
+            rumps.MenuItem("Retry now", callback=lambda _s: self.poll(force=True)),
         ])
 
     def _stacked_image(self, line1, line2, c1, c2):
