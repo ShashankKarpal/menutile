@@ -12,14 +12,14 @@ tolerantly): title line with optional `color` and `templateImage`
 `refresh=true` (with `force=true`, that one run gets MENUTILE_FORCE=1 in its
 environment, so a script with a cache can skip it; the error menu's
 "Retry now" runs the same way), `bash=` with `param1..paramN` and
-`terminal=true/false`.
+`terminal=true/false` (only a command listed exactly with --allow-action).
 Unknown parameters are ignored, never fatal. A line whose tail does not
-parse as parameters is treated as plain text, whole.
+parse as parameters is treated as plain text, whole. Only "\\n" ends a line.
 
 Usage (the LaunchAgent passes these):
     <bundle-exe> menutile.py --name "My Tile" \
         --script /path/to/script --arg=--flag --interval 60 \
-        [--allow-root DIR ...]
+        [--allow-action "/abs/program arg ..." ...]
 
 Rules this renderer keeps on purpose:
   - child processes get PYTHONHOME/PYTHONPATH scrubbed (_child_env)
@@ -33,6 +33,7 @@ import base64
 import datetime
 import hashlib
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -51,17 +52,137 @@ def log(msg):
     print("%s %s" % (ts, msg), file=sys.stderr, flush=True)
 
 
-# Executable roots a menu action may launch: the hosted script's own
-# directory plus the system and Homebrew bin dirs, extended with --allow-root.
-# realpath is compared, so a symlink under a listed root that points
-# elsewhere is refused too. Set by main().
-ACTION_ROOTS = ()
+# The click commands a bash= row may run: exactly the --allow-action entries
+# the tile was installed with, each an absolute program path plus its exact
+# arguments, as (program, args) pairs. Empty means no row is clickable. Set
+# by main(). (Before 2026-11-17 whole folders were allowed, /usr/bin
+# included, so a row that outside text slipped into the output could run
+# env, sh or osascript; a bare name was checked in one place and run from
+# PATH.)
+ALLOWED_ACTIONS = ()
+
+# Shells, interpreters and launchers that run another command, by file
+# name, case-insensitive (the default macOS volume is). Never allowed, even
+# when listed: put the command in a script file of its own and list that.
+# With every argument pinned this is a second line of defence, not the gate,
+# and the list is best effort (a copy of a shell under another name passes).
+_INTERPRETER = re.compile(
+    r"^(env|sh|bash|zsh|dash|ksh|mksh|csh|tcsh|fish|osascript|osacompile"
+    r"|perl[0-9.]*|ruby[0-9.]*|node|nodejs|deno|bun|python[w0-9.]*"
+    r"|php[0-9.]*|lua[0-9.]*|tclsh[0-9.]*|wish[0-9.]*|swift"
+    r"|arch|xargs|nohup|nice|time|timeout|gtimeout|sudo|doas|su|login"
+    r"|script|caffeinate|xcrun|find|awk|gawk|nawk|mawk|command|expect"
+    r"|launchctl|sandbox-exec|ssh|tmux|screen|pwsh|emacs"
+    r"|vi|vim|view|ex|nvim|rvim|rview|vimdiff|shortcuts|automator|java"
+    r"|rscript|julia|irb|uv|uvx|npx|npm|pipx|make|git)$", re.I)
+
+# A control character (tab and ESC excepted: ESC starts ANSI colour codes
+# and ends no line), a Unicode line or paragraph separator, or a bidi
+# control. Python's splitlines() ends a line at several of these, which the
+# shell scripts that print rows do not; a bidi control can make one row's
+# label read like another's.
+_SUSPECT = re.compile("[\x00-\x08\x0a-\x1a\x1c-\x1f\x7f-\x9f\u2028\u2029"
+                      "\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+
+# Refused rows already logged in this process, so a tile installed before
+# the allow list does not log every refused row on every refresh. Capped,
+# because a script can print a different refused row each time.
+_REFUSED_LOGGED = set()
+_REFUSED_LOG_CAP = 200
 
 
-def action_roots(script_path, extra):
-    roots = [os.path.dirname(script_path), "/usr/bin", "/usr/local/bin",
-             "/opt/homebrew/bin"] + list(extra or [])
-    return tuple(os.path.realpath(os.path.expanduser(r)) + "/" for r in roots)
+def _is_interpreter(path):
+    return bool(_INTERPRETER.match(os.path.basename(path)))
+
+
+def configure_actions(entries):
+    """Parse --allow-action values (shell quoting) into (program, args)
+    pairs. An entry whose program is not an absolute path, is a shell,
+    interpreter or launcher (by its own name or the file it resolves to), or
+    holds what no row can carry (" | ", a control character), is logged and
+    dropped. Here a program missing now is kept, so a running tile picks it
+    up once it exists (its rows stay refused until then); install.sh
+    refuses it with runnable(), so a fresh install names a typo at once."""
+    out = []
+    for entry in entries or []:
+        try:
+            tokens = shlex.split(entry)
+        except ValueError:
+            tokens = []
+        if not tokens or not os.path.isabs(tokens[0]):
+            log("allow-action refused (needs an absolute program path): %r"
+                % entry)
+            continue
+        if any(" | " in t or _SUSPECT.search(t) for t in tokens):
+            log("allow-action refused (no row can carry ' | ' or a control "
+                "character): %r" % entry)
+            continue
+        if _is_interpreter(tokens[0]) or _is_interpreter(os.path.realpath(tokens[0])):
+            log("allow-action refused (a shell or interpreter; list a script "
+                "file instead): %r" % entry)
+            continue
+        out.append((tokens[0], tuple(tokens[1:])))
+    return tuple(out)
+
+
+def _row_args(params):
+    """[param1, ..., paramN], or None when the row's param numbers are not
+    exactly 1..N (a gap, param0, param01): such a row would run something
+    other than what it shows, so it is refused."""
+    keys = [k for k in params if re.match(r"param[0-9]+$", k)]
+    want = ["param%d" % n for n in range(1, len(keys) + 1)]
+    if sorted(keys) != sorted(want):
+        return None
+    return [params[k] for k in want]
+
+
+def _log_refused_once(what, raw, args):
+    key = (raw, None if args is None else tuple(args))
+    if key in _REFUSED_LOGGED:
+        return
+    if len(_REFUSED_LOGGED) >= _REFUSED_LOG_CAP:
+        if len(_REFUSED_LOGGED) == _REFUSED_LOG_CAP:
+            _REFUSED_LOGGED.add(None)
+            log("action refused: %d distinct rows logged; not logging more"
+                % _REFUSED_LOG_CAP)
+        return
+    _REFUSED_LOGGED.add(key)
+    log("%s: %r %r" % (what, raw, args))
+
+
+def runnable(program):
+    """True when the file a listed program path resolves to exists, is
+    executable and is not a shell, interpreter or launcher. One check for
+    the renderer (every row, at build and at click) and install.sh."""
+    target = os.path.realpath(program)
+    return (not _is_interpreter(target) and os.path.isfile(target)
+            and os.access(target, os.X_OK))
+
+
+def _resolve_action(raw, args):
+    """(program, args) to run for a bash= row, or None when the row is
+    refused. The row must name a listed program path, or the file that path
+    resolves to, with exactly that entry's arguments; the file must exist,
+    be executable and not be a shell or interpreter. Only listed paths are
+    ever resolved: a path from outside text never reaches the file system
+    (realpath on /net/<host>/... could make the Mac look that host up). The
+    program runs under the path as listed, not its resolved target, because
+    a program can act on the name it is started under (/usr/bin/view is
+    vim). Checked when the menu is built and again on the click."""
+    if args is None or not os.path.isabs(raw):
+        return None
+    args = tuple(args)
+    for program, listed in ALLOWED_ACTIONS:
+        if listed != args:
+            continue
+        if raw not in (program, os.path.realpath(program)):
+            continue
+        # program's own name was checked in configure_actions; runnable()
+        # checks the file it resolves to now (it can change after start).
+        if not runnable(program):
+            return None
+        return program, list(args)
+    return None
 
 
 def _child_env():
@@ -84,7 +205,12 @@ def parse_line(line):
     The dialect separates text from parameters with ' | '. Text may itself
     contain anything, so the split is only accepted when every token on the
     right is key=value; otherwise the whole line is text. Values may be
-    single- or double-quoted (shlex rules)."""
+    single- or double-quoted (shlex rules). A line with a control or
+    line-separator character is all text (each such character shown as
+    U+FFFD), because the scripts that print rows do not treat those as line
+    ends and outside text (a file name, a title) can carry one."""
+    if _SUSPECT.search(line):
+        return _SUSPECT.sub("\ufffd", line), {}
     if line.startswith("| "):
         # Image-only line: empty text, everything after the pipe is params
         # (a title that is only a templateImage).
@@ -107,16 +233,26 @@ def parse_line(line):
 
 
 def parse_output(stdout):
-    """Blocks separated by '---' lines; first block is the title."""
+    """Blocks separated by '---' lines; first block is the title. Only "\\n"
+    ends a line, as in the shells that print the rows; splitlines() also
+    split on \\r, \\v, U+2028 and others, so outside text holding one
+    could start a row of its own."""
     blocks, current = [], []
-    for raw in stdout.splitlines():
-        if raw.strip() == "---":
+    for raw in stdout.split("\n"):
+        # One \r right before the \n is a CRLF line end and is dropped,
+        # whatever the other lines use; it cannot start a row. A \r anywhere
+        # else makes its line plain text (parse_line).
+        if raw.endswith("\r"):
+            raw = raw[:-1]
+        # strip(" \t"), not strip(): strip() also drops \v, \x1c and
+        # U+2028, so outside text like "\v---" would split the menu.
+        if raw.strip(" \t") == "---":
             blocks.append(current)
             current = []
         else:
             current.append(raw)
     blocks.append(current)
-    title_lines = [l for l in blocks[0] if l.strip()] if blocks else []
+    title_lines = [l for l in blocks[0] if l.strip(" \t")] if blocks else []
     menu_blocks = [b for b in blocks[1:]]
     return title_lines, menu_blocks
 
@@ -211,14 +347,21 @@ class MenuTile(rumps.App):
                 if force:
                     env["MENUTILE_FORCE"] = "1"
                     log("manual refresh (force)")
+                # Bytes, not text=True: text mode turns a lone \r into \n
+                # before parse_output sees it, so outside text holding one
+                # would start a row of its own. UTF-8 with replacement, so a
+                # bad byte shows as U+FFFD instead of failing the run (a
+                # LaunchAgent has no locale).
                 p = subprocess.run(self.script_cmd, capture_output=True,
-                                   text=True, timeout=120, env=env)
-                if p.returncode != 0 or not p.stdout.strip():
-                    err = (p.stderr or p.stdout or "no output").strip()
+                                   timeout=120, env=env)
+                out = p.stdout.decode("utf-8", "replace")
+                errtext = p.stderr.decode("utf-8", "replace")
+                if p.returncode != 0 or not out.strip():
+                    err = (errtext or out or "no output").strip()
                     log("script rc=%s: %s" % (p.returncode, err[:200]))
                     result = ("error", "rc=%s" % p.returncode, err[:300])
                 else:
-                    result = ("ok",) + parse_output(p.stdout)
+                    result = ("ok",) + parse_output(out)
             except Exception as e:  # noqa: BLE001 - the bar must survive anything
                 log("script raised: %s: %s" % (type(e).__name__, e))
                 result = ("error", type(e).__name__, str(e)[:300])
@@ -403,22 +546,29 @@ class MenuTile(rumps.App):
             force = params.get("force") == "true"
             return lambda _s, force=force: self.poll(force=force)
         if "bash" in params:
-            # Allowlist: a bash= action runs whatever the hosted script
+            # Allow list: a bash= action runs whatever the hosted script
             # printed, and a script may render text that originates
-            # elsewhere. Only executables under the allowed roots may run;
-            # anything else is logged and becomes a plain, non-clickable row.
-            exe = os.path.realpath(os.path.expanduser(params["bash"]))
-            if not exe.startswith(ACTION_ROOTS):
-                log("action refused (outside allowlist): %s" % exe)
+            # elsewhere. Only a command listed exactly with --allow-action
+            # may run; anything else is logged and becomes a plain,
+            # non-clickable row.
+            raw = params["bash"]
+            args = _row_args(params)
+            if _resolve_action(raw, args) is None:
+                _log_refused_once("action refused (not an --allow-action "
+                                  "entry)", raw, args)
                 return None
-            cmd = [params["bash"]]
-            n = 1
-            while "param%d" % n in params:
-                cmd.append(params["param%d" % n])
-                n += 1
             in_terminal = params.get("terminal") == "true"
 
-            def _run_action(_sender, cmd=cmd, in_terminal=in_terminal):
+            def _run_action(_sender, raw=raw, args=args, in_terminal=in_terminal):
+                # Checked again on the click: a file can change between the
+                # menu build and the click (up to a poll interval).
+                resolved = _resolve_action(raw, args)
+                if resolved is None:
+                    log("action refused at click (not an --allow-action "
+                        "entry): %r %r" % (raw, args))
+                    return
+                # Run the listed path, never the row's raw string.
+                cmd = [resolved[0]] + resolved[1]
                 log("action: %s terminal=%s" % (cmd, in_terminal))
                 try:
                     if in_terminal:
@@ -447,13 +597,22 @@ def main():
     ap.add_argument("--script", required=True)
     ap.add_argument("--arg", action="append", default=[])
     ap.add_argument("--interval", type=int, default=60)
+    ap.add_argument("--allow-action", action="append", default=[],
+                    help='one click command a bash= row may run, exactly: '
+                         '"/abs/program arg ..." (shell quoting)')
+    # Removed 2026-11-17. Still accepted, so an agent installed before then
+    # starts (with every click row off) instead of exiting in a loop.
     ap.add_argument("--allow-root", action="append", default=[],
-                    help="extra directory whose executables bash= actions may run")
+                    help=argparse.SUPPRESS)
     args = ap.parse_args()
-    global ACTION_ROOTS
-    ACTION_ROOTS = action_roots(args.script, args.allow_root)
-    log("start %s script=%s interval=%ss"
-        % (args.name, args.script, args.interval))
+    global ALLOWED_ACTIONS
+    ALLOWED_ACTIONS = configure_actions(args.allow_action)
+    if args.allow_root:
+        log("--allow-root is no longer supported and allows nothing "
+            "(%d ignored); list each click command with --allow-action, "
+            "see the README section Upgrading" % len(args.allow_root))
+    log("start %s script=%s interval=%ss actions=%d"
+        % (args.name, args.script, args.interval, len(ALLOWED_ACTIONS)))
     MenuTile(args.name, [args.script] + args.arg, args.interval).run()
 
 

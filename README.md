@@ -70,8 +70,8 @@ repair; add `--rebuild` to recreate the venv.
 Options: `--arg VALUE` (repeatable; each becomes one token for your script,
 emitted as `--arg=VALUE` so a value that starts with dashes survives),
 `--bundle-id` and `--label` to override the defaults, `--icns FILE` for a
-Finder icon, `--allow-root DIR` (repeatable) to let `bash=` actions run
-executables outside the script's own directory and the system bin dirs.
+Finder icon, `--allow-action "/abs/program arg ..."` (repeatable) to make
+one exact click command available to `bash=` rows (see the dialect below).
 `scripts/uninstall.sh --name "Disk Free"` removes the tile again.
 
 Before its first install the script checks that no app or process already
@@ -106,19 +106,59 @@ part of the text):
   forced if any of those was forced.
   `bash=/path param1=.. paramN=.. terminal=true|false`. Leading `--` marks
   submenu depth, rendered as indentation.
-- `bash=` executables must resolve (after `realpath`) under an allowed root:
-  the script's own directory, `/usr/bin`, `/usr/local/bin`, `/opt/homebrew/bin`,
-  plus any `--allow-root`. Anything else is logged and the row is not
-  clickable. The reason: a `bash=` action runs whatever the script printed,
-  and scripts often render text that came from somewhere else.
+- A `bash=` row is clickable only when it matches one `--allow-action`
+  entry exactly: the entry's program path, or the file that path resolves
+  to, with exactly the entry's arguments as `param1` to
+  `paramN` (a gap in the numbers refuses the row). The program runs under
+  the path you listed. It is checked when the menu is drawn and again on
+  the click. No entry means no clickable `bash=` row. A shell, an
+  interpreter or a launcher that runs another command (`env`, `sh`, `bash`,
+  `zsh`, `osascript`, `python3`, `perl`, `ruby`, `node`, `xargs`, `sudo`,
+  `vim`, `ssh` and their relatives; best effort, the exact arguments are the
+  real gate) is refused even when listed; put the command in a small script
+  file and list that. `install.sh` stops on such an entry, on a program
+  that is not an executable file, and on an argument no row can carry
+  (` | ` or a control character).
+  Any other row is not clickable, and the log names it once. The reason: a
+  `bash=` action runs whatever the script printed, and scripts often render
+  text that came from somewhere else.
+- Only `\n` ends a line. A line holding any other line break (`\r`
+  inside the line, `\v`, U+2028 and the like), another control character
+  (tab and the ESC of ANSI colour codes excepted) or a bidi control is shown
+  as plain text with no parameters. A `\r` right before the `\n` is
+  dropped, so CRLF output parses like `\n` output.
   If your script prints text it did not write (a message, a title, a file
-  name), strip `|` from it first: a `|` in that text starts a parameter
-  tail, so it could add its own `bash=` action that points at an allowed
-  binary such as `/usr/bin/osascript`.
+  name), still strip `|` and line breaks from it: a `|` in that text starts
+  a parameter tail, so it could add a row that runs one of your listed
+  commands.
 
-Keep title text ASCII. Under a LaunchAgent the environment has no locale,
-and a stray multibyte character in the title line can fail the stdout
-decode and kill the render.
+Output is read as UTF-8. A byte that is not valid UTF-8 shows as a
+replacement mark (U+FFFD) instead of failing the render, so the missing
+locale under a LaunchAgent no longer matters.
+
+## Upgrading
+
+Since 2026-11-17 `bash=` rows run only commands you list. A tile installed
+before then still starts, but no `bash=` row in it is clickable, and its
+log says `--allow-root is no longer supported` if it was installed with
+that flag (`install.sh` itself now refuses `--allow-root`). Re-run your
+install command with one `--allow-action` per click command your script
+prints, for example:
+
+```bash
+scripts/install.sh --name "Disk Free" --script /path/to/diskfree.sh --interval 60 \
+  --allow-action "/usr/bin/open -a 'Disk Utility'"
+```
+
+That entry makes this row clickable, and no other:
+`Open Disk Utility | bash=/usr/bin/open param1=-a param2="Disk Utility"`.
+Quote a path or an argument with spaces inside the entry, as in a shell.
+
+Rows that build a command on the fly, for example
+`bash=/usr/bin/open param1=https://example.com/pull/123` with a URL that
+changes with each run, can no longer be clickable: every argument must be
+listed in advance. Show such a link as plain text, or have a fixed script
+of your own (listed with `--allow-action`) work out the URL when clicked.
 
 ## Operating it
 
@@ -144,9 +184,10 @@ decode and kill the render.
 ~/.menutile-venv/bin/python3 -m unittest discover -s tests -v
 ```
 
-`tests/test_parse.py` covers the dialect parser and the action allowlist;
-`tests/test_refresh.py` covers forced and queued refreshes without starting
-the menu bar. CI runs gitleaks on every push and weekly.
+`tests/test_parse.py` covers the dialect parser; `tests/test_actions.py`
+covers the click-action allow list and the line splitting (nothing runs:
+the process launcher is replaced by a recorder); `tests/test_refresh.py`
+covers forced and queued refreshes without starting the menu bar. CI runs gitleaks on every push and weekly.
 
 ## Design principle
 

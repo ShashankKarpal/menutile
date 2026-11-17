@@ -11,7 +11,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from menutile import action_roots, parse_line, parse_output, _child_env  # noqa: E402
+from menutile import parse_line, parse_output, _child_env  # noqa: E402
 
 
 class ParseLine(unittest.TestCase):
@@ -103,13 +103,6 @@ class Environment(unittest.TestCase):
         self.assertNotIn("PYTHONHOME", env)
         self.assertNotIn("PYTHONPATH", env)
         self.assertIn("PATH", env)
-
-    def test_action_roots_include_script_dir_and_extras(self):
-        roots = action_roots("/opt/tiles/my.sh", ["~/bin"])
-        self.assertIn(os.path.realpath("/opt/tiles") + "/", roots)
-        self.assertIn(os.path.realpath(os.path.expanduser("~/bin")) + "/", roots)
-        self.assertIn(os.path.realpath("/usr/bin") + "/", roots)
-        self.assertTrue(all(r.endswith("/") for r in roots))
 
 
 if __name__ == "__main__":

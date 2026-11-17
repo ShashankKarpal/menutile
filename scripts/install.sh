@@ -13,12 +13,15 @@
 # Usage:
 #   scripts/install.sh --name "My Tile" --script /path/to/tile.sh \
 #       [--interval 60] [--arg VALUE ...] [--bundle-id com.example.mytile] \
-#       [--label com.example.mytile] [--icns FILE] [--allow-root DIR ...] \
-#       [--rebuild]
+#       [--label com.example.mytile] [--icns FILE] \
+#       [--allow-action "/abs/program arg ..." ...] [--rebuild]
 #
 # Every --arg is passed to the script as one token, emitted as --arg=VALUE
-# so a value that itself starts with dashes survives argparse. The agent's
-# stdout and stderr go to ~/Library/Logs/menutile/<label>.log.
+# so a value that itself starts with dashes survives argparse. Each
+# --allow-action is one click command a bash= row may run, exactly: an
+# absolute program path plus its exact arguments, in shell quoting; no shell
+# or interpreter. Nothing else is clickable. The agent's stdout and stderr go
+# to ~/Library/Logs/menutile/<label>.log.
 #
 # Why the bundle: macOS presents notification banners and real process names
 # only for LaunchServices-registered .app bundles. An unbundled interpreter
@@ -32,7 +35,7 @@
 set -euo pipefail
 
 NAME=""; SCRIPT=""; INTERVAL=60; BID=""; LABEL=""; ICNS=""; REBUILD=0
-ARGS=(); ROOTS=()
+ARGS=(); ACTIONS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --name) NAME="$2"; shift 2 ;;
@@ -43,7 +46,8 @@ while [ $# -gt 0 ]; do
     --bundle-id) BID="$2"; shift 2 ;;
     --label) LABEL="$2"; shift 2 ;;
     --icns) ICNS="$2"; shift 2 ;;
-    --allow-root) ROOTS+=("$2"); shift 2 ;;
+    --allow-action) ACTIONS+=("$2"); shift 2 ;;
+    --allow-root) echo "--allow-root was removed (2026-11-17): list each click command with --allow-action; see the README section Upgrading" >&2; exit 2 ;;
     --rebuild) REBUILD=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -91,6 +95,29 @@ fi
 uv pip install --python "$VENV/bin/python3" --quiet 'rumps>=0.4.0'
 "$VENV/bin/python3" -c 'import rumps' || fail "rumps not importable"
 
+if [ "${#ACTIONS[@]}" -gt 0 ]; then
+  step "Click commands (--allow-action)"
+  # The renderer's own check, so a refused entry fails here, loudly, not as
+  # one line in the agent log later.
+  "$VENV/bin/python3" -I - "$REPO" ${ACTIONS[@]+"${ACTIONS[@]}"} <<'PY' \
+    || fail "an --allow-action entry was refused (reason above); see the README, Dialect"
+import sys
+sys.path.insert(0, sys.argv[1])
+import menutile
+entries = sys.argv[2:]
+ok = menutile.configure_actions(entries)
+bad = 0
+for program, args in ok:
+    if menutile.runnable(program):
+        print("allowed: %r %r" % (program, list(args)))
+    else:
+        print("refused: %r is not an executable file (or resolves to an "
+              "interpreter)" % program, file=sys.stderr)
+        bad += 1
+sys.exit(0 if len(ok) == len(entries) and not bad else 1)
+PY
+fi
+
 step "$NAME: bundle"
 mkdir -p "$LOGS"
 ICON_ARGS=()
@@ -107,8 +134,8 @@ for a in ${ARGS[@]+"${ARGS[@]}"}; do
   ARGS_XML="$ARGS_XML    <string>--arg=$(xml_escape "$a")</string>
 "
 done
-for r in ${ROOTS[@]+"${ROOTS[@]}"}; do
-  ARGS_XML="$ARGS_XML    <string>--allow-root</string><string>$(xml_escape "$r")</string>
+for r in ${ACTIONS[@]+"${ACTIONS[@]}"}; do
+  ARGS_XML="$ARGS_XML    <string>--allow-action</string><string>$(xml_escape "$r")</string>
 "
 done
 cat > "$PLIST.new" <<EOF
